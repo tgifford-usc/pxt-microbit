@@ -1,7 +1,11 @@
 namespace pxsim {
     const SERIAL_BUFFER_LENGTH = 16;
+
     export class SerialState {
-        serialIn: string[] = [];
+        // Keep a single RX string buffer rather than string[] chunks.
+        private rxBuffer = "";
+        // Track delimiters registered via onDataReceived
+        private delimiters = new Set<string>();
 
         constructor(private readonly runtime: Runtime, private readonly board: BaseBoard) {
             this.board.addMessageListener(this.handleMessage.bind(this))
@@ -9,18 +13,44 @@ namespace pxsim {
 
         private handleMessage(msg: SimulatorMessage) {
             if (msg.type === "serial") {
-                const data = (<SimulatorSerialMessage>msg).data || "";
+                const data = (msg as SimulatorSerialMessage).data || "";
                 this.receiveData(data);
             }
         }
 
+        /** Called when serial data arrives *into* the simulator (web -> sim) */
         public receiveData(data: string) {
-            this.serialIn.push();
+            if (!data) return;
+
+            this.rxBuffer += data;
+
+            // Fire delimiter event if any registered delimiter appears
+            for (const d of this.delimiters) {
+                if (d && this.rxBuffer.indexOf(d) !== -1) {
+                    // Raise the same event hardware uses so onDataReceived handlers run
+                    this.board.bus.queue(
+                        DAL.MICROBIT_ID_SERIAL,
+                        DAL.MICROBIT_SERIAL_EVT_DELIM_MATCH
+                    );
+                    // Don't break; allow multiple delimiters
+                }
+            }
         }
 
+        /** Read buffered received data (sim version) */
         readSerial() {
-            let v = this.serialIn.shift() || "";
+            // Return everything we have, then clear (matches readBuffer-ish semantics)
+            const v = this.rxBuffer;
+            this.rxBuffer = "";
             return v;
+        }
+
+        /** Allow serial.onDataReceived to register delimiters */
+        registerDelimiter(delims: string) {
+            // In the runtime, delimiters are typically single chars; accept any string.
+            // If callers pass something like "\n", store it as-is.
+            if (!delims) return;
+            this.delimiters.add(delims);
         }
 
         serialOutBuffer: string = "";
@@ -49,6 +79,7 @@ namespace pxsim {
     }
 }
 
+
 namespace pxsim.serial {
     export function writeString(s: string) {
         board().writeSerial(s);
@@ -59,7 +90,19 @@ namespace pxsim.serial {
     }
 
     export function readUntil(del: string): string {
-        return readString();
+        const s = readString();
+        if (!del) return s;
+
+        const idx = s.indexOf(del);
+        if (idx === -1) {
+            // put it back if delimiter not found
+            board().serialState.receiveData(s);
+            return "";
+        }
+        const out = s.slice(0, idx);
+        const rest = s.slice(idx + del.length);
+        if (rest) board().serialState.receiveData(rest);
+        return out;
     }
 
     export function readString(): string {
@@ -67,7 +110,8 @@ namespace pxsim.serial {
     }
 
     export function onDataReceived(delimiters: string, handler: RefAction) {
-        let b = board();
+        const b = board();
+        b.serialState.registerDelimiter(delimiters);
         b.bus.listen(DAL.MICROBIT_ID_SERIAL, DAL.MICROBIT_SERIAL_EVT_DELIM_MATCH, handler);
     }
 
@@ -100,5 +144,9 @@ namespace pxsim.serial {
 
     export function writeDmesg() {
         // TODO
+    }
+
+    export function inject(data: string) {
+        board().serialState.receiveData(data);
     }
 }
