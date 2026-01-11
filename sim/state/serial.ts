@@ -151,6 +151,7 @@ namespace pxsim.serial {
         const b = board();
         b.serialState.registerDelimiter(delimiters);
         b.bus.listen(DAL.MICROBIT_ID_SERIAL, DAL.MICROBIT_SERIAL_EVT_DELIM_MATCH, handler);
+        b.bus.queue(DAL.MICROBIT_ID_SERIAL, DAL.MICROBIT_SERIAL_EVT_DELIM_MATCH);
     }
 
     export function redirect(tx: number, rx: number, rate: number) {
