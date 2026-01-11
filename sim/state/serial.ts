@@ -34,10 +34,13 @@ namespace pxsim {
 
         /** Called when serial data arrives *into* the simulator (web -> sim) */
         public receiveData(data: string) {
+            console.log("receiveData", JSON.stringify(data), data.split("").map(c=>c.charCodeAt(0)));
+            
             if (!data) return;
 
             this.rxBuffer += data;
-
+            console.log("rxBuffer now", JSON.stringify(this.rxBuffer));
+            
             // Fire delimiter event if any registered delimiter appears
             for (const d of this.delimiters) {
                 const delim = normalizeDelimiter(d);
@@ -85,7 +88,9 @@ namespace pxsim {
             // In the runtime, delimiters are typically single chars; accept any string.
             // If callers pass something like "\n", store it as-is.
             if (!delims) return;
-            this.delimiters.add(delims);
+            const norm = normalizeDelimiter(delims);
+            const codes = norm.split("").map(ch => ch.charCodeAt(0));
+            console.log("registerDelimiter", JSON.stringify(delims), "=>", JSON.stringify(norm), codes);this.delimiters.add(delims);
         }
 
         serialOutBuffer: string = "";
