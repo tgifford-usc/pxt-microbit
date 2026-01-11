@@ -1,6 +1,20 @@
 namespace pxsim {
     const SERIAL_BUFFER_LENGTH = 16;
 
+    function normalizeDelimiter(d: string): string {
+       if (!d) return "";
+
+        // Common cases:
+        // "\n" actual newline -> keep
+        // "\\n" two characters -> convert to newline
+        // "10" etc -> leave alone (we only support string delimiters)
+        if (d === "\\n") return "\n";
+        if (d === "\\r") return "\r";
+        if (d === "\\r\\n") return "\r\n";
+
+        return d;
+    }
+
     export class SerialState {
         // Keep a single RX string buffer rather than string[] chunks.
         private rxBuffer = "";
@@ -26,9 +40,13 @@ namespace pxsim {
 
             // Fire delimiter event if any registered delimiter appears
             for (const d of this.delimiters) {
-                if (d && this.rxBuffer.indexOf(d) !== -1) {
-                    // Raise the same event hardware uses so onDataReceived handlers run
-                    this.board.bus.queue(
+                const delim = normalizeDelimiter(d);
+                if (!delim) continue;
+
+                if (this.rxBuffer.indexOf(delim) !== -1) {
+                    // IMPORTANT: use the current runtime board bus (same one as serial.onDataReceived)
+                    const b = pxsim.board();
+                    b?.bus?.queue(
                         DAL.MICROBIT_ID_SERIAL,
                         DAL.MICROBIT_SERIAL_EVT_DELIM_MATCH
                     );
@@ -44,6 +62,23 @@ namespace pxsim {
             this.rxBuffer = "";
             return v;
         }
+
+        readUntil(delim: string): string {
+            const d = normalizeDelimiter(delim);
+            if (!d) {
+                const v = this.rxBuffer;
+                this.rxBuffer = "";
+                return v;
+            }
+
+            const idx = this.rxBuffer.indexOf(d);
+            if (idx === -1) return "";
+
+            const out = this.rxBuffer.slice(0, idx);
+            this.rxBuffer = this.rxBuffer.slice(idx + d.length);
+            return out;
+        }
+
 
         /** Allow serial.onDataReceived to register delimiters */
         registerDelimiter(delims: string) {
@@ -89,20 +124,23 @@ namespace pxsim.serial {
         // TODO
     }
 
-    export function readUntil(del: string): string {
-        const s = readString();
-        if (!del) return s;
+    // export function readUntil(del: string): string {
+    //     const s = readString();
+    //     if (!del) return s;
 
-        const idx = s.indexOf(del);
-        if (idx === -1) {
-            // put it back if delimiter not found
-            board().serialState.receiveData(s);
-            return "";
-        }
-        const out = s.slice(0, idx);
-        const rest = s.slice(idx + del.length);
-        if (rest) board().serialState.receiveData(rest);
-        return out;
+    //     const idx = s.indexOf(del);
+    //     if (idx === -1) {
+    //         // put it back if delimiter not found
+    //         board().serialState.receiveData(s);
+    //         return "";
+    //     }
+    //     const out = s.slice(0, idx);
+    //     const rest = s.slice(idx + del.length);
+    //     if (rest) board().serialState.receiveData(rest);
+    //     return out;
+    // }
+    export function readUntil(del: string): string {
+        return board().serialState.readUntil(del);
     }
 
     export function readString(): string {
