@@ -84,14 +84,27 @@ namespace pxsim {
 
 
         /** Allow serial.onDataReceived to register delimiters */
+        // registerDelimiter(delims: string) {
+        //     // In the runtime, delimiters are typically single chars; accept any string.
+        //     // If callers pass something like "\n", store it as-is.
+        //     if (!delims) return;
+        //     const norm = normalizeDelimiter(delims);
+        //     const codes = norm.split("").map(ch => ch.charCodeAt(0));
+        //     console.log("registerDelimiter", JSON.stringify(delims), "=>", JSON.stringify(norm), codes);this.delimiters.add(delims);
+        // }
         registerDelimiter(delims: string) {
-            // In the runtime, delimiters are typically single chars; accept any string.
-            // If callers pass something like "\n", store it as-is.
             if (!delims) return;
-            const norm = normalizeDelimiter(delims);
-            const codes = norm.split("").map(ch => ch.charCodeAt(0));
-            console.log("registerDelimiter", JSON.stringify(delims), "=>", JSON.stringify(norm), codes);this.delimiters.add(delims);
+
+            const d = normalizeDelimiter(delims);
+            this.delimiters.add(d);
+
+            // If data already arrived containing this delimiter, trigger the event now
+            if (d && this.rxBuffer.indexOf(d) !== -1) {
+                const b = pxsim.board();
+                b?.bus?.queue(DAL.MICROBIT_ID_SERIAL, DAL.MICROBIT_SERIAL_EVT_DELIM_MATCH);
+            }
         }
+
 
         serialOutBuffer: string = "";
         writeSerial(s: string) {
@@ -156,7 +169,7 @@ namespace pxsim.serial {
         const b = board();
         b.serialState.registerDelimiter(delimiters);
         b.bus.listen(DAL.MICROBIT_ID_SERIAL, DAL.MICROBIT_SERIAL_EVT_DELIM_MATCH, handler);
-        b.bus.queue(DAL.MICROBIT_ID_SERIAL, DAL.MICROBIT_SERIAL_EVT_DELIM_MATCH);
+        // b.bus.queue(DAL.MICROBIT_ID_SERIAL, DAL.MICROBIT_SERIAL_EVT_DELIM_MATCH);
     }
 
     export function redirect(tx: number, rx: number, rate: number) {
