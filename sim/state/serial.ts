@@ -98,10 +98,14 @@ namespace pxsim {
             const d = normalizeDelimiter(delims);
             this.delimiters.add(d);
 
-            // If data already arrived containing this delimiter, trigger the event now
+            // Catch-up: if data already arrived and contains the delimiter,
+            // trigger the same event hardware would raise.
             if (d && this.rxBuffer.indexOf(d) !== -1) {
                 const b = pxsim.board();
-                b?.bus?.queue(DAL.MICROBIT_ID_SERIAL, DAL.MICROBIT_SERIAL_EVT_DELIM_MATCH);
+                b?.bus?.queue(
+                    DAL.MICROBIT_ID_SERIAL,
+                    DAL.MICROBIT_SERIAL_EVT_DELIM_MATCH
+                );
             }
         }
 
