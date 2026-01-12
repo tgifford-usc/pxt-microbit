@@ -48,11 +48,8 @@ namespace pxsim {
 
                 if (this.rxBuffer.indexOf(delim) !== -1) {
                     // IMPORTANT: use the current runtime board bus (same one as serial.onDataReceived)
-                    const b = pxsim.board();
-                    b?.bus?.queue(
-                        DAL.MICROBIT_ID_SERIAL,
-                        DAL.MICROBIT_SERIAL_EVT_DELIM_MATCH
-                    );
+                    // const b = pxsim.board();
+                    this.board?.bus?.queue(DAL.MICROBIT_ID_SERIAL, DAL.MICROBIT_SERIAL_EVT_DELIM_MATCH);
                     // Don't break; allow multiple delimiters
                 }
             }
@@ -101,11 +98,8 @@ namespace pxsim {
             // Catch-up: if data already arrived and contains the delimiter,
             // trigger the same event hardware would raise.
             if (d && this.rxBuffer.indexOf(d) !== -1) {
-                const b = pxsim.board();
-                b?.bus?.queue(
-                    DAL.MICROBIT_ID_SERIAL,
-                    DAL.MICROBIT_SERIAL_EVT_DELIM_MATCH
-                );
+                // const b = pxsim.board();
+                this.board?.bus?.queue(DAL.MICROBIT_ID_SERIAL, DAL.MICROBIT_SERIAL_EVT_DELIM_MATCH);
             }
         }
 
@@ -173,7 +167,7 @@ namespace pxsim.serial {
         const b = board();
         b.serialState.registerDelimiter(delimiters);
         b.bus.listen(DAL.MICROBIT_ID_SERIAL, DAL.MICROBIT_SERIAL_EVT_DELIM_MATCH, handler);
-        // b.bus.queue(DAL.MICROBIT_ID_SERIAL, DAL.MICROBIT_SERIAL_EVT_DELIM_MATCH);
+        console.log("same board?", b === b.serialState["board"]);
     }
 
     export function redirect(tx: number, rx: number, rate: number) {
